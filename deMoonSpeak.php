@@ -59,7 +59,7 @@
         if (preg_match(CN_SYMBOLS_REGEXP, $source) > 0) {
 
           $t_translate++;
-          $t_bytes += mb_strlen($source);
+          $t_bytes += strlen($source);
 
           if (isset($cache[$source])) {
             $translation = $cache[$source];
@@ -67,12 +67,12 @@
             $translation = GoogleTranslate::translate($source, 'zh-CN', 'en');
 
             if (empty($translation)) {
-              die 'GoogleTranslate returned empty string!';
+              exit('GoogleTranslate returned empty string!');
             }
 
             $cache[$source] = $translation;
             $c_translate++;
-            $c_bytes += mb_strlen($source);
+            $c_bytes += strlen($source);
           }
 
           $original = str_replace($source, $translation, $original);
@@ -89,28 +89,41 @@
     }
   }
 
-  // using SPL
+  $path = $argv[1];
 
-  /**
-   * @var $rdi RecursiveDirectoryIterator
-   */
-  $rdi = new RecursiveDirectoryIterator($argv[1]);
+  if (is_dir($path)) {
 
-  /**
-   * @var $rii RecursiveIteratorIterator
-   */
-  $rii = new RecursiveIteratorIterator($rdi, RecursiveIteratorIterator::SELF_FIRST);
+    // using SPL
 
-  //TODO: refactor file processing bia SPL
-  /**
-   * @var $file SplFileInfo
-   */
+    /**
+     * @var $rdi RecursiveDirectoryIterator
+     */
+    $rdi = new RecursiveDirectoryIterator($argv[1]);
 
-  foreach ($rii as $file) {
-    //TODO: wrap $file into RecursiveRegexIterator and use MIME type
-    if (!$file->isDir() and $file->isWritable() and preg_match('/.+\.(?:php|txt|tpl|htm|html|js|css)/i', $file->getFilename())) {
-      deMoonSpeak($file);
+    /**
+     * @var $rii RecursiveIteratorIterator
+     */
+    $rii = new RecursiveIteratorIterator($rdi, RecursiveIteratorIterator::SELF_FIRST);
+
+    //TODO: refactor file processing bia SPL
+    /**
+     * @var $file SplFileInfo
+     */
+
+    foreach ($rii as $file) {
+      //TODO: wrap $file into RecursiveRegexIterator and use MIME type
+      if (!$file->isDir() and $file->isWritable() and preg_match('/.+\.(?:php|txt|tpl|htm|html|js|css)/i', $file->getFilename())) {
+        deMoonSpeak($file);
+      }
     }
+  }
+  elseif (is_file($path)) {
+
+    $file = new SplFileInfo($path);
+    deMoonSpeak($file);
+
+  } else {
+    exit('Must be path or file');
   }
 
 
