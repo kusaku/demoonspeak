@@ -12,10 +12,7 @@
    */
   class GoogleTranslate {
 
-    /**
-     * @var string
-     */
-    private static $APIKey = '{YOUR_GOOGLE_API_KEY}';
+    private static $APIKey = 'AIzaSyCkBV8HsNOGkqQ81ZIpiYQrZxKwDH1CqtQ';
 
     /**
      * @var string

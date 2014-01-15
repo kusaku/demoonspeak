@@ -22,6 +22,8 @@
   #                             ___________________(_____chinese_____)___|_______________________(_____chinese_____)________________________
   #                             (?|(?:__|______)___(___$matches[1]___)___|_______________________(___$matches[1]___)_______________________)
   define('MS_COMMENT_REGEXP', '/(?|(?:#+|\/{2,})\s*(['.MS_SYMBOLS.']+)\s*|\/\*['.EN_SYMBOLS.'\n]*(['.MS_SYMBOLS.']+)['.EN_SYMBOLS.'\n]*\*\/)/u');
+  
+  define('CACHE_FILE', realpath(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'cache.php');
 
 
   require_once 'GoogleTranslate.php';
@@ -29,7 +31,7 @@
   /**
    * @param $file SplFileInfo Source code file object
    */
-  function deMoonSpeak($file) {
+  function deMoonSpeak($file, $area = '') {
     // counters
     static $t_file = 0, $c_file = 0;
     static $t_translate = 0, $c_translate = 0;
@@ -40,8 +42,8 @@
      */
     static $cache = array();
 
-    if (empty($cache) and file_exists('cache.php')) {
-      $cache = include 'cache.php';
+    if (empty($cache) and file_exists(CACHE_FILE)) {
+      $cache = include CACHE_FILE;
     }
 
     /**
@@ -51,45 +53,66 @@
 
     $t_file++;
 
-    if (preg_match_all(MS_COMMENT_REGEXP, $original, $matches)) {
+    $source = '';
 
+    if (count($area = explode(':', $area)) == 4) {
+      list($from_line, $from_column, $to_line, $to_column) = $area;
+      $lines = file($file->getPathname());
+      if ($from_line < $to_line) {
+        for ($line = $from_line; $line < $to_line; $line++) {
+          $source .= mb_substr($lines[$line - 1], $from_column - 1);
+        }
+        $source .= mb_substr($lines[$line - 1], 0, $to_column - 1);
+      } else {
+        $source .= mb_substr($lines[$from_line - 1], $from_column - 1, $to_column - $from_column);
+      }
+    }
+    if (!empty($source)) {
+      if (isset($cache[$source])) {
+        $translation = $cache[$source];
+      }
+      else {
+        $translation = GoogleTranslate::translate($source, 'zh-CN', 'en');
+        if (empty($translation)) {
+          exit('GoogleTranslate returned empty string!');
+        }
+        $cache[$source] = $translation;
+      }
+      $original = str_replace($source, $translation, $original);
+      echo "{$file->getFilename()}: translated {$source} to {$translation}.\n";
+      file_put_contents($file->getPathname(), $original);
+    }
+    elseif (preg_match_all(MS_COMMENT_REGEXP, $original, $matches)) {
       $c_file++;
-
       foreach ($matches[1] as $source) {
         if (preg_match(CN_SYMBOLS_REGEXP, $source) > 0) {
-
           $t_translate++;
           $t_bytes += strlen($source);
-
           if (isset($cache[$source])) {
             $translation = $cache[$source];
-          } else {
+          }
+          else {
             $translation = GoogleTranslate::translate($source, 'zh-CN', 'en');
-
             if (empty($translation)) {
               exit('GoogleTranslate returned empty string!');
             }
-
             $cache[$source] = $translation;
             $c_translate++;
             $c_bytes += strlen($source);
           }
-
           $original = str_replace($source, $translation, $original);
-
           echo "[{$c_file}/{$t_file}:{$c_translate}/{$t_translate}({$c_bytes}/{$t_bytes})] {$file->getFilename()}: translated {$source} to {$translation}.\n";
         }
       }
-
       file_put_contents($file->getPathname(), $original);
     }
-
     if (!empty($cache)) {
-      file_put_contents('cache.php', "<?php\n\nreturn " . var_export($cache, TRUE) . ";");
+      file_put_contents(CACHE_FILE, "<?php\n\nreturn " . var_export($cache, TRUE) . ";");
     }
   }
 
   $path = $argv[1];
+  $area = isset($argv[2]) ? $argv[2] : '';
 
   if (is_dir($path)) {
 
@@ -113,14 +136,14 @@
     foreach ($rii as $file) {
       //TODO: wrap $file into RecursiveRegexIterator and use MIME type
       if (!$file->isDir() and $file->isWritable() and preg_match('/.+\.(?:php|txt|tpl|htm|html|js|css)/i', $file->getFilename())) {
-        deMoonSpeak($file);
+        deMoonSpeak($file, $area);
       }
     }
   }
   elseif (is_file($path)) {
 
     $file = new SplFileInfo($path);
-    deMoonSpeak($file);
+    deMoonSpeak($file, $area);
 
   } else {
     exit('Must be path or file');
