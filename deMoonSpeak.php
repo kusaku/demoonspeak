@@ -51,23 +51,35 @@
      */
     $original = file_get_contents($file->getPathname());
 
+    $encoding = mb_detect_encoding($original);
+    mb_internal_encoding($encoding);
+
     $t_file++;
 
     $source = '';
 
-    if (count($area = explode(':', $area)) == 4) {
+    if (4 == count($area = explode(':', $area))) {
       list($from_line, $from_column, $to_line, $to_column) = $area;
       $lines = file($file->getPathname());
-      if ($from_line < $to_line) {
-        for ($line = $from_line; $line < $to_line; $line++) {
-          $source .= mb_substr($lines[$line - 1], $from_column - 1);
+      $source = '';
+      if ($from_line > count($lines) || $from_line >= $to_line && $from_column >= $to_column) {
+      } else do {
+        if ($from_line == $to_line) {
+          $source .= mb_substr($lines[$from_line - 1], $from_column - 1, $to_column - $from_column);
+          break;
         }
-        $source .= mb_substr($lines[$line - 1], 0, $to_column - 1);
-      } else {
-        $source .= mb_substr($lines[$from_line - 1], $from_column - 1, $to_column - $from_column);
-      }
+        if ($from_line < $to_line) {
+          $source .= $lines[$from_line - 1];
+          $from_line++;
+        }
+        if ($from_line == $to_line) {
+          $source .= mb_substr($lines[$from_line - 1], 0, $to_column - $from_column);
+          break;
+        }
+      } while (true);
     }
-    if (!empty($source)) {
+
+    if (0 < mb_strlen($source)) {
       if (isset($cache[$source])) {
         $translation = $cache[$source];
       }
@@ -82,6 +94,7 @@
       echo "{$file->getFilename()}: translated {$source} to {$translation}.\n";
       file_put_contents($file->getPathname(), $original);
     }
+
     elseif (preg_match_all(MS_COMMENT_REGEXP, $original, $matches)) {
       $c_file++;
       foreach ($matches[1] as $source) {
